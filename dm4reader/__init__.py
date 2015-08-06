@@ -1,0 +1,329 @@
+import collections
+import struct
+import array 
+
+DM4Header = collections.namedtuple('DM4Header', ('version', 'root_length', 'little_endian')) 
+DM4TagHeader = collections.namedtuple('DM4TagHeader', ('type', 'name', 'byte_length', 'array_length', 'data_type_code', 'header_offset', 'data_offset'))
+DM4DirHeader = collections.namedtuple('DM4DirHeader', ('type', 'name', 'byte_length', 'sorted', 'closed', 'num_tags', 'data_offset'))
+
+DM4Tag = collections.namedtuple('DM4Tag', ('name', 'data_type_code', 'data'))
+
+
+DM4DataType = collections.namedtuple('DM4DataTypes', ('num_bytes', 'signed', 'type_format'))
+
+DM4DataTypeDict = {2: DM4DataType(2,True,'h'), #2byte signed integer
+                   3: DM4DataType(4,True,'i'), #4byte signed integer
+                   4: DM4DataType(2,False,'H'), #2byte unsigned integer
+                   5: DM4DataType(4,False,'I'), #4byte unsigned integer
+                   6: DM4DataType(4,False,'f'), #4byte float
+                   7: DM4DataType(8,False,'d'), #8byte float
+                   8: DM4DataType(1,False, '?'),
+                   9: DM4DataType(1,False, 'c'),
+                   10: DM4DataType(1,True,'b'),
+                   11: DM4DataType(8,True,'q'),
+                   12: DM4DataType(8,True,'Q')
+                   }
+
+DM4_header_size = 4+8+4+1+1+8
+DM4_root_tag_dir_header_size = 1+1+8
+
+def tag_is_directory(tag):
+    return tag.type == 20
+ 
+def read_header_dm4(dmfile):
+    dmfile.seek(0)
+    version = int.from_bytes(dmfile.read(4), byteorder='big')
+    rootlength = int.from_bytes(dmfile.read(8), byteorder='big')
+    byteorder = int.from_bytes(dmfile.read(4), byteorder='big')
+    
+    little_endian = byteorder == 1
+    
+    return DM4Header(version, rootlength, little_endian)
+
+def _get_endian_str(endian):
+    '''
+    DM4 header encodes little endian as byte value 1 in the header
+    :return: 'big' or 'little' for use with python's int.frombytes function
+    '''
+    if isinstance(endian, str):
+        return endian 
+    
+    assert(isinstance(endian,int))
+    if endian == 1:
+        return 'little'
+    
+    return 'big'   
+
+def _get_struct_endian_str(endian):
+    '''
+    DM4 header encodes little endian as byte value 1 in the header.  However when that convention is followed the wrong values are read.  So this implementation is reversed.
+    :return: '>' or '<' for use with python's struct.unpack function
+    '''
+    if isinstance(endian,str):
+        if endian == 'little':
+            return '>' #Little Endian
+        else:
+            return '<' #Big Endian
+    else:
+        if endian == 1:
+            return '>' #Little Endian
+        else:
+            return '<' #Big Endian
+
+def read_root_tag_dir_header_dm4(dmfile, endian):
+    '''Read the root directory information from a dm4 file.
+       File seek position is left at end of root_tag_dir_header'''
+    if not isinstance(endian, str):
+        endian = _get_endian_str(endian)
+        
+    issorted = int.from_bytes(dmfile.read(1), byteorder=endian)
+    isclosed = int.from_bytes(dmfile.read(1), byteorder=endian)
+    num_tags = int.from_bytes(dmfile.read(8), byteorder='big') #DM4 specifies this property as always big endian
+    
+    data_offset = dmfile.tell()
+    
+    dmfile.seek(DM4_header_size) 
+    return DM4DirHeader(20,None, 0, issorted, isclosed, num_tags, DM4_header_size) 
+
+def read_tag_header_dm4(dmfile, endian):
+    '''Read the tag from the file.  Leaves file at the end of the tag data, ready to read the next tag from the file'''
+    tag_header_offset = dmfile.tell()
+    tag_type = int.from_bytes(dmfile.read(1), byteorder=endian)
+    if tag_type == 20:
+        return _read_tag_dir_header_dm4(dmfile, endian)
+    if tag_type == 0:
+        return None
+    
+    tag_name = _read_tag_name(dmfile, endian)
+    tag_byte_length = int.from_bytes(dmfile.read(8), byteorder='big') #DM4 specifies this property as always big endian
+    
+    tag_data_offset = dmfile.tell()
+    
+    _read_tag_garbage_str(dmfile)
+ 
+    (tag_array_length,  tag_array_types) = _read_tag_data_info(dmfile)
+     
+    dmfile.seek(tag_data_offset + tag_byte_length)
+    return DM4TagHeader(tag_type, tag_name, tag_byte_length, tag_array_length, tag_array_types[0], tag_header_offset, tag_data_offset)
+
+def _read_tag_name(dmfile, endian):
+    tag_name_len = int.from_bytes(dmfile.read(2), byteorder='big') #DM4 specifies this property as always big endian
+    tag_name = None
+    if tag_name_len > 0:
+        data =  dmfile.read(tag_name_len)
+        try:
+            tag_name = data.decode('utf-8', errors='ignore')
+        except UnicodeDecodeError as e:
+            tag_name = None
+            pass
+    
+    return tag_name
+    
+def _read_tag_dir_header_dm4(dmfile, endian):
+
+    tag_name = _read_tag_name(dmfile, endian)
+    tag_byte_length = int.from_bytes(dmfile.read(8), byteorder='big') #DM4 specifies this property as always big endian
+    issorted = int.from_bytes(dmfile.read(1), byteorder=endian)
+    isclosed = int.from_bytes(dmfile.read(1), byteorder=endian)
+    num_tags = int.from_bytes(dmfile.read(8), byteorder='big') #DM4 specifies this property as always big endian
+    
+    data_offset = dmfile.tell()
+    
+    return DM4DirHeader(20, tag_name, tag_byte_length, issorted, isclosed, num_tags, data_offset)
+
+def _read_tag_garbage_str(dmfile):
+    '''
+    DM4 has four bytes of % symbols in the tag.  Ensure it is there.
+    '''
+    garbage_str = dmfile.read(4).decode('utf-8')
+    assert(garbage_str == '%%%%')
+    
+def _read_tag_data_info(dmfile):
+    tag_array_length = int.from_bytes(dmfile.read(8), byteorder='big')
+    format_str = '>' + tag_array_length * 'q' #Big endian signed long
+    
+    bytes = dmfile.read(8*tag_array_length)
+    
+    tag_array_types = struct.unpack_from(format_str, bytes)
+    
+    return (tag_array_length,  tag_array_types)
+
+
+def _read_tag_data(dmfile, tag, endian):
+    assert(tag.type == 21)
+    try:
+        
+        endian = _get_endian_str(endian)
+        dmfile.seek(tag.data_offset)
+        
+    
+        _read_tag_garbage_str(dmfile)
+        (tag_array_length,  tag_array_types) = _read_tag_data_info(dmfile)
+        
+        tag_data_type_code = tag_array_types[0]
+        
+        if tag_data_type_code == 15:
+            return read_tag_data_group(dmfile, tag, endian)
+        elif tag_data_type_code == 20:
+            return read_tag_data_array(dmfile, tag, endian)
+        
+        if not tag_data_type_code in DM4DataTypeDict:
+            print ("Missing type " + str(tag_data_type_code))
+            return None
+        
+        return _read_tag_data_value(dmfile, endian, tag_data_type_code)
+    
+    finally:
+        #Ensure we are in the correct position to read the next tag regardless of how reading this tag goes
+        dmfile.seek(tag.data_offset + tag.byte_length)
+        
+    return data_list
+
+def _read_tag_data_value(dmfile, endian, type_code):
+    data_type = DM4DataTypeDict[type_code]
+    format_str = _get_struct_endian_str(endian) + data_type.type_format
+    byte_data = dmfile.read(data_type.num_bytes)
+    
+    data = struct.unpack_from(format_str, byte_data)
+    return data[0]
+
+def read_tag_data_group(dmfile, tag, endian):
+    endian = _get_endian_str(endian)
+    dmfile.seek(tag.data_offset)
+    
+    _read_tag_garbage_str(dmfile)
+    (tag_array_length,  tag_array_types) = _read_tag_data_info(dmfile)
+        
+    tag_data_type = tag_array_types[0]
+    assert(tag_data_type == 15)
+    
+    length_groupname = tag_array_types[1]
+    number_of_entries_in_group = tag_array_types[2]
+    field_data = tag_array_types[3:]
+    
+    field_types_list = []
+    
+    for iField in range(0,number_of_entries_in_group):
+        fieldname_length = field_data[iField*2]
+        fieldname_type = field_data[(iField*2)+1]
+        field_types_list.append(fieldname_type)
+        
+    fields_data = []
+    for field_type in field_types_list:
+        field_data = _read_tag_data_value(dmfile, endian, field_type)
+        fields_data.append(field_data)
+        
+    return fields_data
+
+def read_tag_data_array(dmfile, tag, endian):
+    endian = _get_endian_str(endian)
+    dmfile.seek(tag.data_offset)
+    
+    _read_tag_garbage_str(dmfile)
+    
+    (tag_array_length,  tag_array_types) = _read_tag_data_info(dmfile)
+        
+    assert(tag_array_types[0] == 20)
+    array_data_type_code = tag_array_types[1]
+    array_length = tag_array_types[2]
+    
+    if array_data_type_code == 15:
+        return "Array of groups length %d and type %d" % (array_length, array_data_type_code)
+     
+    assert(len(tag_array_types) == 3)
+    
+    data_type = DM4DataTypeDict[array_data_type_code]
+    
+    #format_str = _get_struct_endian_str(endian) + data_type.type_format * array_length
+    #byte_data = dmfile.read(data_type.num_bytes * array_length)
+    
+    #if array_data_type_code == 4:
+        #try:
+            #data = byte_data.decode('utf-16')
+        #except UnicodeDecodeError as e:
+        #data = struct.unpack_from(format_str, byte_data) 
+    #else:
+    data = array.array(data_type.type_format)
+    data.fromfile(dmfile, array_length)
+    
+    return data
+        
+    #data = struct.unpack_from(format_str, byte_data)
+    #return data 
+
+      
+class DM4File:
+    @property
+    def endian_str(self):
+        return self._endian_str 
+    
+    @property
+    def hfile(self):
+        return self._hfile
+        
+    def __init__(self, filedata):
+        '''
+        :param file filedata: file handle to dm4 file
+        '''
+        self._hfile = filedata
+        self.header = read_header_dm4(self.hfile)
+        self._endian_str = None
+        if self.header.little_endian:
+            self._endian_str = 'big'
+        else:
+            self._endian_str = 'little'
+            
+        self.root_tag_dir_header = read_root_tag_dir_header_dm4(self.hfile, endian=self.endian_str)
+        
+    def close(self):
+        self._hfile.close()
+        self._hfile = None
+             
+    @classmethod
+    def open(cls, filename):
+        '''
+        :param str filename: Name of DM4 file to open
+        :rtype: DM4File
+        :return: DM4File object
+        '''
+        
+        hfile = open(filename, "rb")
+        return DM4File(hfile)
+    
+    def read_tag_data(self, tag):
+        '''Read the data associated with the passed tag'''
+        return _read_tag_data(self.hfile, tag, self.endian_str)
+    
+    def walk_tags(self):
+        
+        tag_dir_header = read_root_tag_dir_header_dm4(self.hfile, self.endian_str)
+        
+        return self.walk_tag_dir(tag_dir_header)
+    
+    #DM4TagDir = collections.namedtuple('DM4Dir', ('name', '_tag_data', 'named_tags', 'unnamed_tags'))
+        
+    def walk_tag_dir(self, tag_dir_header):
+        tags = {}
+        
+        unnamed_tags = []
+        named_tags = {}
+        for iTag in range(0,tag_dir_header.num_tags):
+            tag = read_tag_header_dm4(self.hfile, self.endian_str)
+            if tag is None:
+                break
+            
+            if not tag.name in tags:
+                tags[tag.name] = tag            
+                
+            if tag_is_directory(tag):
+                tags[tag.name] = self.walk_tag_dir(tag)
+            else:
+                tags[tag.name] = tag#DM4Tag(tag.name, tag.data_type_code, read_tag_data(self.hfile, tag, self.endian_str))
+                
+        
+        return tags
+        
+    
+        
+     
+    
