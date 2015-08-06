@@ -177,7 +177,6 @@ def _read_tag_data(dmfile, tag, endian):
         #Ensure we are in the correct position to read the next tag regardless of how reading this tag goes
         dmfile.seek(tag.data_offset + tag.byte_length)
         
-    return data_list
 
 def _read_tag_data_value(dmfile, endian, type_code):
     data_type = DM4DataTypeDict[type_code]
@@ -234,23 +233,11 @@ def read_tag_data_array(dmfile, tag, endian):
     
     data_type = DM4DataTypeDict[array_data_type_code]
     
-    #format_str = _get_struct_endian_str(endian) + data_type.type_format * array_length
-    #byte_data = dmfile.read(data_type.num_bytes * array_length)
-    
-    #if array_data_type_code == 4:
-        #try:
-            #data = byte_data.decode('utf-16')
-        #except UnicodeDecodeError as e:
-        #data = struct.unpack_from(format_str, byte_data) 
-    #else:
     data = array.array(data_type.type_format)
     data.fromfile(dmfile, array_length)
     
     return data
         
-    #data = struct.unpack_from(format_str, byte_data)
-    #return data 
-
       
 class DM4File:
     @property
@@ -300,28 +287,29 @@ class DM4File:
         
         return self.walk_tag_dir(tag_dir_header)
     
-    #DM4TagDir = collections.namedtuple('DM4Dir', ('name', '_tag_data', 'named_tags', 'unnamed_tags'))
+    DM4TagDir = collections.namedtuple('DM4Dir', ('name', 'dm4_tag', 'named_subdirs', 'unnamed_subdirs','named_tags', 'unnamed_tags'))
         
-    def walk_tag_dir(self, tag_dir_header):
-        tags = {}
+    def walk_tag_dir(self, tag_dir_header): 
         
-        unnamed_tags = []
-        named_tags = {}
+        dir_obj = DM4File.DM4TagDir(tag_dir_header.name, tag_dir_header, {},[], {}, [])
+        
         for iTag in range(0,tag_dir_header.num_tags):
             tag = read_tag_header_dm4(self.hfile, self.endian_str)
             if tag is None:
                 break
             
-            if not tag.name in tags:
-                tags[tag.name] = tag            
-                
             if tag_is_directory(tag):
-                tags[tag.name] = self.walk_tag_dir(tag)
+                if tag.name is None:
+                    dir_obj.unnamed_subdirs.append( self.walk_tag_dir(tag))
+                else:
+                    dir_obj.named_subdirs[tag.name] = self.walk_tag_dir(tag) 
             else:
-                tags[tag.name] = tag#DM4Tag(tag.name, tag.data_type_code, read_tag_data(self.hfile, tag, self.endian_str))
+                if tag.name is None:
+                    dir_obj.unnamed_tags.append(tag)            
+                else:
+                    dir_obj.named_tags[tag.name] = tag
                 
-        
-        return tags
+        return dir_obj
         
     
         
