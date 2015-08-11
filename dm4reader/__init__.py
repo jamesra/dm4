@@ -277,27 +277,31 @@ class DM4File:
     def read_tag_data(self, tag):
         '''Read the data associated with the passed tag'''
         return _read_tag_data(self.hfile, tag, self.endian_str)
-    
-    def walk_tags(self):
-         
-        return self.walk_tag_dir(self.root_tag_dir_header)
+     
     
     DM4TagDir = collections.namedtuple('DM4Dir', ('name', 'dm4_tag', 'named_subdirs', 'unnamed_subdirs','named_tags', 'unnamed_tags'))
         
-    def walk_tag_dir(self, tag_dir_header): 
+    def read_directory(self, directory_tag=None):
+        '''
+        Read the directories and tags from a dm4 file.  The first step in working with a dm4 file.
+        :return: A named collection containing information about the directory
+        ''' 
         
-        dir_obj = DM4File.DM4TagDir(tag_dir_header.name, tag_dir_header, {},[], {}, [])
+        if directory_tag is None:
+            directory_tag = self.root_tag_dir_header
+            
+        dir_obj = DM4File.DM4TagDir(directory_tag.name, directory_tag, {},[], {}, [])
         
-        for iTag in range(0,tag_dir_header.num_tags):
+        for iTag in range(0,directory_tag.num_tags):
             tag = read_tag_header_dm4(self.hfile, self.endian_str)
             if tag is None:
                 break
             
             if tag_is_directory(tag):
                 if tag.name is None:
-                    dir_obj.unnamed_subdirs.append( self.walk_tag_dir(tag))
+                    dir_obj.unnamed_subdirs.append( self.read_directory(tag))
                 else:
-                    dir_obj.named_subdirs[tag.name] = self.walk_tag_dir(tag) 
+                    dir_obj.named_subdirs[tag.name] = self.read_directory(tag) 
             else:
                 if tag.name is None:
                     dir_obj.unnamed_tags.append(tag)            

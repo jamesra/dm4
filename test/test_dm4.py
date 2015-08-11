@@ -4,16 +4,14 @@ import os
 import dm4reader
 import array
 
-import six
-import nornir_imageregistration.core as core
-
+import six 
 import PIL
 
 import numpy as np
 
 
 def try_convert_unsigned_short_to_unicode(data, count_limit=2048):
-    '''Convert an array of less than specified length to a unicode string'''
+    '''Attempt to convert arrays of 16-bit integers of less than specified length to a unicode string.'''
     
     if not isinstance(data, array.array):
         return data
@@ -33,6 +31,8 @@ def try_convert_unsigned_short_to_unicode(data, count_limit=2048):
         
     
 def print_tag_data(dmfile, tag, indent_level):
+    '''Print data associated with a dm4 tag'''
+    
     if tag.byte_length > 2048:
         print(indent_level * '\t' + '%s\t' % (tag.name) + "Array length %d too long to read" % (tag.array_length))
         return 
@@ -43,24 +43,25 @@ def print_tag_data(dmfile, tag, indent_level):
     if six.PY3:
         print(indent_level * '\t' + '%s\t%s' % (tag.name, str(data)))
     else:
-        if isinstance(data, array.array) and data.typecode == 'H': #Unconverted unicode or image data
+        if isinstance(data, array.array) and data.typecode == 'H':  # Unconverted unicode or image data
             print(indent_level * '\t' + '%s\t%s' % (tag.name, "Unconverted array of unsigned 16-bit integers"))
         elif isinstance(data, unicode):
             print(indent_level * '\t' + '%s\t%s' % (tag.name, data))
         else:
             if tag.name is None:
-                print(indent_level * '\t' + 'Unnamed tag\t%s' % ( str(data)))
+                print(indent_level * '\t' + 'Unnamed tag\t%s' % (str(data)))
             else:
-                print(indent_level * '\t' + tag.name.encode('ascii', 'ignore') + '\t%s' % ( str(data)))
+                print(indent_level * '\t' + tag.name.encode('ascii', 'ignore') + '\t%s' % (str(data)))
 
 def print_tag_directory_tree(dmfile, dir_obj, indent_level=0):
+    '''Print all of the tags and directories contained in a dm4 file'''
     
     for tag in dir_obj.unnamed_tags:
-        print_tag_data(dmfile, tag,indent_level)
+        print_tag_data(dmfile, tag, indent_level)
         
     for k in sorted(dir_obj.named_tags.keys()):
         tag = dir_obj.named_tags[k]
-        print_tag_data(dmfile, tag,indent_level)
+        print_tag_data(dmfile, tag, indent_level)
         
     for subdir in dir_obj.unnamed_subdirs:
         print(indent_level * '\t' + "Unnamed directory")
@@ -73,22 +74,35 @@ def print_tag_directory_tree(dmfile, dir_obj, indent_level=0):
     
     indent_level -= 1
 
+
 class testDM4(unittest.TestCase):
+    
+    @property
+    def dm4_input_filename(self):
+        '''The name of the dm4 file to read during the test.  Change this to suit your test input file'''
+        return 'Glumi1_3VBSED_stack_05_slice_0476.dm4'
+    
+    @property
+    def dm4_input_dirname(self):
+        '''The directory containing the dm4 file'''
+        return os.path.join('D:\\', 'Data', 'Neitz')
+    
+    @property
+    def dm4_input_fullpath(self):
+        return os.path.join(self.dm4_input_dirname, self.dm4_input_filename)
 
     def test(self):
-        dmdir = os.path.join('D:\\','Data','Nietz')
-        image_filename = 'Glumi1_3VBSED_stack_05_slice_0476.dm4'
-        dmfullpath = os.path.join(dmdir,image_filename)
-        dmfile = dm4reader.DM4File.open(dmfullpath)
         
-        tags = dmfile.walk_tags()
+        dmfile = dm4reader.DM4File.open(self.dm4_input_fullpath)
+        
+        tags = dmfile.read_directory()
         print_tag_directory_tree(dmfile, tags)
         
-        self.Extract_Image(dmfile, tags, image_filename)
+        self.Extract_Image(dmfile, tags, self.dm4_input_filename)
         
         
     def Extract_Image(self, dmfile, tags, image_filename):
-        data_tag = tags.named_subdirs['ImageList'].unnamed_subdirs[1].named_subdirs['ImageData'].named_tags['Data'] 
+        data_tag = tags.named_subdirs['ImageList'].unnamed_subdirs[1].named_subdirs['ImageData'].named_tags['Data']
         
         file_basename = os.path.basename(image_filename)
         output_dirname = 'C:\\Temp'
@@ -97,11 +111,8 @@ class testDM4(unittest.TestCase):
         output_fullpath = os.path.join(output_dirname, output_filename)
          
         np_array = np.array(dmfile.read_tag_data(data_tag), dtype=np.uint16)
-        np_array = np.reshape(np_array, (9000,9000))
-        #np_array = core.NormalizeImage(np_array)
-        #core.ShowGrayscale(np_array)
-        #core.SaveImage(output_fullpath, np_array)
-        #image = PIL.Image.frombuffer("I", (9000,9000), dmfile.read_tag_data(data_tag), "raw", "I", 0,1)
+        np_array = np.reshape(np_array, (9000, 9000))
+         
         image = PIL.Image.fromarray(np_array, 'I;16')
         image.save(output_fullpath) 
           
