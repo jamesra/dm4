@@ -13,8 +13,7 @@ Example
    
 Below is a short example of reading the image data from a dm4 file.  A more complete example can be found in the tests.
 
-..
-   import dm4reader
+.. import dm4reader
    
    dm4data = dm4reader.DM4File.open("sample.dm4")
    
