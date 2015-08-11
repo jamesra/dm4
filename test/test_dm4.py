@@ -5,7 +5,7 @@ import dm4reader
 import array
 
 import six 
-import PIL
+from PIL import Image
 
 import numpy as np
 
@@ -88,17 +88,27 @@ class testDM4(unittest.TestCase):
         return os.path.join('D:\\', 'Data', 'Neitz')
     
     @property
+    def ImageDimensionsTag(self):
+        return self.tags.named_subdirs['ImageList'].unnamed_subdirs[1].named_subdirs['ImageData'].named_subdirs['Dimensions']
+    
+    def ReadImageShape(self):  
+        XDim = self.dm4file.read_tag_data(self.ImageDimensionsTag.unnamed_tags[0])
+        YDim = self.dm4file.read_tag_data(self.ImageDimensionsTag.unnamed_tags[1])
+        
+        return (YDim, XDim)
+    
+    @property
     def dm4_input_fullpath(self):
         return os.path.join(self.dm4_input_dirname, self.dm4_input_filename)
 
     def test(self):
         
-        dmfile = dm4reader.DM4File.open(self.dm4_input_fullpath)
+        self.dm4file = dm4reader.DM4File.open(self.dm4_input_fullpath)
         
-        tags = dmfile.read_directory()
-        print_tag_directory_tree(dmfile, tags)
+        self.tags = self.dm4file .read_directory()
+        print_tag_directory_tree(self.dm4file , self.tags)
         
-        self.Extract_Image(dmfile, tags, self.dm4_input_filename)
+        self.Extract_Image(self.dm4file , self.tags, self.dm4_input_filename)
         
         
     def Extract_Image(self, dmfile, tags, image_filename):
@@ -111,9 +121,9 @@ class testDM4(unittest.TestCase):
         output_fullpath = os.path.join(output_dirname, output_filename)
          
         np_array = np.array(dmfile.read_tag_data(data_tag), dtype=np.uint16)
-        np_array = np.reshape(np_array, (9000, 9000))
+        np_array = np.reshape(np_array, self.ReadImageShape())
          
-        image = PIL.Image.fromarray(np_array, 'I;16')
+        image = Image.fromarray(np_array, 'I;16')
         image.save(output_fullpath) 
           
         dmfile.close()
