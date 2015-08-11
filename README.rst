@@ -11,27 +11,27 @@ This package would not have been possible without the documentation provided by 
 Example
 #######
    
-Below is a short example of reading the image data from a dm4 file.  A more complete example can be found in the tests.
+Below is a short example of reading the image data from a dm4 file.  A more complete example can be found in the tests.::
 
-.. code-block:: python
-   import dm4reader
-   
-   dm4data = dm4reader.DM4File.open("sample.dm4")
-   
-   tags = dm4data.read_directory()
-   
-   image_data_tag = tags.named_subdirs['ImageList'].unnamed_subdirs[1].named_subdirs['ImageData']
-   image_tag = image_data_tag.named_tags['Data']
-   
-   XDim = self.dm4file.read_tag_data(image_data_tag.named_subdirs['Dimensions'].unnamed_tags[0])
-   YDim = self.dm4file.read_tag_data(image_data_tag.named_subdirs['Dimensions'].unnamed_tags[1])
-   
-   np_array = np.array(dmfile.read_tag_data(data_tag), dtype=np.uint16)
-   np_array = np.reshape(np_array, (YDim, XDim))
-   
-   output_fullpath = "sample.tif"
-   image = PIL.Image.fromarray(np_array, 'I;16')
-   image.save(output_fullpath)        
+   .. code-block:: python
+      import dm4reader
+      
+      dm4data = dm4reader.DM4File.open("sample.dm4")
+      
+      tags = dm4data.read_directory()
+      
+      image_data_tag = tags.named_subdirs['ImageList'].unnamed_subdirs[1].named_subdirs['ImageData']
+      image_tag = image_data_tag.named_tags['Data']
+      
+      XDim = self.dm4file.read_tag_data(image_data_tag.named_subdirs['Dimensions'].unnamed_tags[0])
+      YDim = self.dm4file.read_tag_data(image_data_tag.named_subdirs['Dimensions'].unnamed_tags[1])
+      
+      np_array = np.array(dmfile.read_tag_data(data_tag), dtype=np.uint16)
+      np_array = np.reshape(np_array, (YDim, XDim))
+      
+      output_fullpath = "sample.tif"
+      image = PIL.Image.fromarray(np_array, 'I;16')
+      image.save(output_fullpath)        
    
 
 ####
