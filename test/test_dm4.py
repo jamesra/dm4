@@ -6,6 +6,7 @@ import array
 
 import six 
 from PIL import Image
+Image.MAX_IMAGE_PIXELS = None
 
 import numpy as np
 
@@ -80,12 +81,15 @@ class testDM4(unittest.TestCase):
     @property
     def dm4_input_filename(self):
         '''The name of the dm4 file to read during the test.  Change this to suit your test input file'''
-        return 'Glumi1_3VBSED_stack_05_slice_0476.dm4'
+        #return 'Glumi1_3VBSED_stack_05_slice_0476.dm4'
+        return 'SigmaDM4_previous_version.dm4'
     
     @property
     def dm4_input_dirname(self):
         '''The directory containing the dm4 file'''
-        return os.path.join('D:\\', 'Data', 'Neitz')
+        #return os.path.join('D:\\', 'Data', 'Neitz')
+        #return os.path.join('J:\\', 'NM_SRC_renum', 'Montage_000')
+        return os.path.join('J:\\')
     
     @property
     def ImageDimensionsTag(self):
@@ -108,7 +112,7 @@ class testDM4(unittest.TestCase):
         self.tags = self.dm4file .read_directory()
         print_tag_directory_tree(self.dm4file , self.tags)
         
-        self.Extract_Image(self.dm4file , self.tags, self.dm4_input_filename)
+        #self.Extract_Image(self.dm4file , self.tags, self.dm4_input_filename)
         
         
     def Extract_Image(self, dmfile, tags, image_filename):
