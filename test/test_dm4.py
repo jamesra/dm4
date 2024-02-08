@@ -6,13 +6,16 @@ import array
 
 import six 
 from PIL import Image
+
+import dm4reader.dm4file
+
 Image.MAX_IMAGE_PIXELS = None
 
 import numpy as np
 
 
 def try_convert_unsigned_short_to_unicode(data, count_limit=2048):
-    '''Attempt to convert arrays of 16-bit integers of less than specified length to a unicode string.'''
+    """Attempt to convert arrays of 16-bit integers of less than specified length to a unicode string."""
     
     if not isinstance(data, array.array):
         return data
@@ -32,7 +35,7 @@ def try_convert_unsigned_short_to_unicode(data, count_limit=2048):
         
     
 def print_tag_data(dmfile, tag, indent_level):
-    '''Print data associated with a dm4 tag'''
+    """Print data associated with a dm4 tag"""
     
     if tag.byte_length > 2048:
         print(indent_level * '\t' + '%s\t' % (tag.name) + "Array length %d too long to read" % (tag.array_length))
@@ -55,7 +58,7 @@ def print_tag_data(dmfile, tag, indent_level):
                 print(indent_level * '\t' + tag.name.encode('ascii', 'ignore') + '\t%s' % (str(data)))
 
 def print_tag_directory_tree(dmfile, dir_obj, indent_level=0):
-    '''Print all of the tags and directories contained in a dm4 file'''
+    """Print all of the tags and directories contained in a dm4 file"""
     
     for tag in dir_obj.unnamed_tags:
         print_tag_data(dmfile, tag, indent_level)
@@ -80,13 +83,13 @@ class testDM4(unittest.TestCase):
     
     @property
     def dm4_input_filename(self):
-        '''The name of the dm4 file to read during the test.  Change this to suit your test input file'''
+        """The name of a dm4 file to read during the test.  Change this to suit your test input file"""
         #return 'Glumi1_3VBSED_stack_05_slice_0476.dm4'
         return 'SigmaDM4_previous_version.dm4'
     
     @property
     def dm4_input_dirname(self):
-        '''The directory containing the dm4 file'''
+        """The directory containing a dm4 file"""
         #return os.path.join('D:\\', 'Data', 'Neitz')
         #return os.path.join('J:\\', 'NM_SRC_renum', 'Montage_000')
         return os.path.join('J:\\')
@@ -107,11 +110,10 @@ class testDM4(unittest.TestCase):
 
     def test(self):
         
-        self.dm4file = dm4reader.DM4File.open(self.dm4_input_fullpath)
-        
-        self.tags = self.dm4file .read_directory()
-        print_tag_directory_tree(self.dm4file , self.tags)
-        
+        with dm4reader.dm4file.DM4File.open(self.dm4_input_fullpath) as self.dm4file:
+            self.tags = self.dm4file.read_directory()
+            print_tag_directory_tree(self.dm4file , self.tags)
+
         #self.Extract_Image(self.dm4file , self.tags, self.dm4_input_filename)
         
         
