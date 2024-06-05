@@ -5,19 +5,23 @@ import struct
 import array
 import sys
 
-import dm4reader
-from dm4reader.headers import DM4TagHeader, DM4Header, DM4DirHeader
-
-from dm4reader import format_config
+import dm4
+from dm4.headers import DM4TagHeader, DM4Header, DM4DirHeader
+from dm4 import format_config
 
 
 class DM4File:
     @property
     def endian_str(self) -> str:
+        """
+        '>' == Little Endian
+        '<' == Big Endian
+        """
         return self._endian_str
 
     @property
     def hfile(self) -> BinaryIO:
+        """Handle to the DM4 file."""
         return self._hfile
 
     def __init__(self, filedata: BinaryIO):
@@ -31,6 +35,7 @@ class DM4File:
         self.root_tag_dir_header = read_root_tag_dir_header_dm4(self.hfile, endian=self.endian_str)
 
     def close(self):
+        """Manually close the file handle if one is not using a context manager"""
         self._hfile.close()
         self._hfile = None
 
@@ -151,13 +156,13 @@ def read_root_tag_dir_header_dm4(dmfile: BinaryIO, endian: str | int):
     if not isinstance(endian, str):
         endian = _get_struct_endian_str(endian)
 
-    dmfile.seek(dm4reader.format_config.header_size)
+    dmfile.seek(dm4.format_config.header_size)
 
     issorted = struct.unpack_from(endian + 'b', dmfile.read(1))[0]  # type: bool
     isclosed = struct.unpack_from(endian + 'b', dmfile.read(1))[0]  # type: bool
     num_tags = struct.unpack_from('>Q', dmfile.read(8))[0]  # DM4 specifies this property as always big endian
 
-    return DM4DirHeader(20, None, 0, issorted, isclosed, num_tags, dm4reader.format_config.header_size)
+    return DM4DirHeader(20, None, 0, issorted, isclosed, num_tags, dm4.format_config.header_size)
 
 
 def read_tag_header_dm4(dmfile: BinaryIO, endian: str) -> DM4TagHeader | DM4DirHeader | None:
@@ -246,7 +251,7 @@ def _read_tag_data(dmfile: BinaryIO, tag: DM4TagHeader, endian: str) -> Any:
         elif tag_data_type_code == 20:
             return read_tag_data_array(dmfile, tag, endian)
 
-        if tag_data_type_code not in dm4reader.format_config.data_type_dict:
+        if tag_data_type_code not in dm4.format_config.data_type_dict:
             # You can replace the exception with "return None" if you want to get the data you can
             # from the file and ignore reading the unknown data types
             raise ValueError("Unknown data type code " + str(tag_data_type_code))
@@ -261,10 +266,10 @@ def _read_tag_data(dmfile: BinaryIO, tag: DM4TagHeader, endian: str) -> Any:
 
 
 def _read_tag_data_value(dmfile: BinaryIO, endian: str, type_code: int) -> Any:
-    if type_code not in dm4reader.format_config.data_type_dict:
+    if type_code not in dm4.format_config.data_type_dict:
         raise ValueError("Unknown data type code " + str(type_code))
 
-    data_type = dm4reader.format_config.data_type_dict[type_code]
+    data_type = dm4.format_config.data_type_dict[type_code]
     format_str = _get_struct_endian_str(endian) + data_type.type_format
     byte_data = dmfile.read(data_type.num_bytes)
 
