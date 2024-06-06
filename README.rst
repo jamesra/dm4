@@ -1,9 +1,8 @@
-
 #########
 dm4reader
 #########
 
-A python file reader for Digital Micrograph's DM4 file format
+A simple pure python file reader for Digital Micrograph's DM4 file format
 
 This package would not have been possible without the documentation provided by Dr Chris Boothroyd at http://www.er-c.org/cbb/info/dmformat/ Thank you.
 
@@ -13,9 +12,9 @@ Example
    
 Below is a short example of reading the image data from a dm4 file.  A more complete example can be found in the tests.::
 
-   import dm4reader
+   import dm4
 
-   dm4data = dm4reader.DM4File.open("sample.dm4")
+   dm4data = dm4.DM4File.open("sample.dm4")
 
    tags = dm4data.read_directory()
 

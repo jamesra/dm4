@@ -11,6 +11,15 @@ from dm4 import format_config
 
 
 class DM4File:
+    """
+    Provides functions for reading data from a DM4 file.
+    Maintains an open file handle to the DM4 file.
+    """
+    _hfile: BinaryIO | None  # Set to None only when the file is closed
+    header: DM4Header
+    _endian_str: str  # '>' == Little Endian, '<' == Big Endian
+    root_tag_dir_header: DM4DirHeader
+
     @property
     def endian_str(self) -> str:
         """
@@ -20,8 +29,8 @@ class DM4File:
         return self._endian_str
 
     @property
-    def hfile(self) -> BinaryIO:
-        """Handle to the DM4 file."""
+    def hfile(self) -> BinaryIO | None:
+        """Handle to the DM4 file.  Set to None only when the file has been closed"""
         return self._hfile
 
     def __init__(self, filedata: BinaryIO):
@@ -69,8 +78,6 @@ class DM4File:
         unnamed_subdirs: list[DM4File.DM4TagDir]
         named_tags: dict[str, DM4TagHeader]
         unnamed_tags: list[DM4TagHeader]
-
-    # DM4TagDir = collections.namedtuple('DM4Dir', ('name', 'dm4_tag', 'named_subdirs', 'unnamed_subdirs','named_tags', 'unnamed_tags'))
 
     def read_directory(self, directory_tag: DM4DirHeader | None = None) -> DM4TagDir:
         """
@@ -306,12 +313,11 @@ def read_tag_data_group(dmfile: BinaryIO, tag: DM4TagHeader, endian: str) -> lis
 
 
 def system_byte_order() -> str:
-    if sys.byteorder == 'little':
-        return '<'
-    return '>'
+    """Fetches the system byte order with the < or > character convention used by struct unpack"""
+    return '<' if sys.byteorder == 'little' else '>'
 
 
-def read_tag_data_array(dmfile: BinaryIO, tag: DM4TagHeader, endian: str):
+def read_tag_data_array(dmfile: BinaryIO, tag: DM4TagHeader, endian: str) -> array.array:
     dmfile.seek(tag.data_offset)
 
     _check_tag_verification_str(dmfile)
@@ -323,7 +329,7 @@ def read_tag_data_array(dmfile: BinaryIO, tag: DM4TagHeader, endian: str):
     array_length = tag_array_types[2]
 
     if array_data_type_code == 15:
-        return "Array of groups length %d and type %d" % (array_length, array_data_type_code)
+        raise NotImplementedError("Array of groups length %d and type %d" % (array_length, array_data_type_code))
 
     assert (len(tag_array_types) == 3)
 
