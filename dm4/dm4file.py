@@ -1,6 +1,6 @@
 from __future__ import annotations
 import contextlib
-from typing import NamedTuple, BinaryIO, Generator, Any
+from typing import NamedTuple, BinaryIO, Generator, Any, Optional
 import struct
 import array
 import sys
@@ -15,7 +15,7 @@ class DM4File:
     Provides functions for reading data from a DM4 file.
     Maintains an open file handle to the DM4 file.
     """
-    _hfile: BinaryIO | None  # Set to None only when the file is closed
+    _hfile: Optional[BinaryIO]  # Set to None only when the file is closed
     header: DM4Header
     _endian_str: str  # '>' == Little Endian, '<' == Big Endian
     root_tag_dir_header: DM4DirHeader
