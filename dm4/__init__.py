@@ -8,7 +8,7 @@ A Digital Micrograph 4 (DM4) file reader.
       Removed dependency on the six module
 """
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 from dm4.headers import DM4DataType, DM4DirHeader, DM4Header, DM4TagHeader, DM4Config, DM4TagDir, format_config
 from dm4.dm4file import DM4File
