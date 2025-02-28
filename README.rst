@@ -41,6 +41,15 @@ Below is a short example of reading the image data from a dm4 file.  A more comp
        image = PIL.Image.fromarray(image_array, 'I;16')
        image.save(output_fullpath)
 
+############
+Script usage
+############
+
+The dm4 module can be invoked as a script to print a dm4 file's full directory to the command line.  This is helpful when determining the exact structure of a specific DM4 file: ::
+
+    python -m dm4 your_dm4_file.dm4
+
+
 ####
 Todo
 ####
