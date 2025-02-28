@@ -49,6 +49,18 @@ The dm4 module can be invoked as a script to print a dm4 file's full directory t
 
     python -m dm4 your_dm4_file.dm4
 
+################
+Helper Functions
+################
+
+Print all of the tags and directories contianed in a dm4 file to the console::
+
+  dm4.print_tag_directory_tree(dmfile: DM4File, dir_obj: DM4TagDir, indent_level: int = 0)
+
+Print data associated with a specific tag to the console, if it is printable::
+
+  dm4.print_tag_data(dmfile: DM4File, tag: Union[DM4TagHeader, DM4DirHeader], indent_level: int):
+
 
 ####
 Todo
