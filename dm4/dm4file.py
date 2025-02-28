@@ -6,14 +6,16 @@ import array
 import sys
 
 import dm4
-from dm4.headers import DM4TagHeader, DM4Header, DM4DirHeader
+from dm4.headers import DM4TagHeader, DM4Header, DM4DirHeader, DM4TagDir
+
 from dm4 import format_config
 
 
 class DM4File:
-    """
+    """ 
     Provides functions for reading data from a DM4 file.
     Maintains an open file handle to the DM4 file.
+    DM4File.open supports the context manager protocol and may be used in a with statement to automatically close the underlying file handle.
     """
     _hfile: Optional[BinaryIO]  # Set to None only when the file is closed
     header: DM4Header
@@ -25,12 +27,14 @@ class DM4File:
         """
         '>' == Little Endian
         '<' == Big Endian
+
+        Compatible for use with struct.unpack
         """
         return self._endian_str
 
     @property
     def hfile(self) -> BinaryIO | None:
-        """Handle to the DM4 file.  Set to None only when the file has been closed"""
+        """Handle to the DM4 file.  Set to None only when the file has been closed.  Should not be needed by library users in typical use cases."""
         return self._hfile
 
     def __init__(self, filedata: BinaryIO):
@@ -71,14 +75,6 @@ class DM4File:
         """Read the data associated with the passed tag"""
         return _read_tag_data(self.hfile, tag, self.endian_str)
 
-    class DM4TagDir(NamedTuple):
-        name: str
-        dm4_tag: DM4DirHeader
-        named_subdirs: dict[str, DM4File.DM4TagDir]
-        unnamed_subdirs: list[DM4File.DM4TagDir]
-        named_tags: dict[str, DM4TagHeader]
-        unnamed_tags: list[DM4TagHeader]
-
     def read_directory(self, directory_tag: DM4DirHeader | None = None) -> DM4TagDir:
         """
         Read the directories and tags from a dm4 file.  The first step in working with a dm4 file.
@@ -88,7 +84,7 @@ class DM4File:
         if directory_tag is None:
             directory_tag = self.root_tag_dir_header
 
-        dir_obj = DM4File.DM4TagDir(directory_tag.name, directory_tag, {}, [], {}, [])
+        dir_obj = DM4TagDir(directory_tag.name, directory_tag, {}, [], {}, [])
 
         for iTag in range(0, directory_tag.num_tags):
             tag = read_tag_header_dm4(self.hfile, self.endian_str)
@@ -272,7 +268,7 @@ def _read_tag_data(dmfile: BinaryIO, tag: DM4TagHeader, endian: str) -> Any:
         dmfile.seek(tag.data_offset + tag.byte_length)
 
 
-def _read_tag_data_value(dmfile: BinaryIO, endian: str, type_code: int) -> Any:
+def _read_tag_data_value(dmfile: BinaryIO, endian: str, type_code: int) -> tuple:
     if type_code not in dm4.format_config.data_type_dict:
         raise ValueError("Unknown data type code " + str(type_code))
 
@@ -329,7 +325,7 @@ def read_tag_data_array(dmfile: BinaryIO, tag: DM4TagHeader, endian: str) -> arr
     array_length = tag_array_types[2]
 
     if array_data_type_code == 15:
-        raise NotImplementedError("Array of groups length %d and type %d" % (array_length, array_data_type_code))
+        return "Array of groups length %d and type %d" % (array_length, array_data_type_code)
 
     assert (len(tag_array_types) == 3)
 

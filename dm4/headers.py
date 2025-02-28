@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import NamedTuple, Optional
 
 
@@ -47,6 +48,16 @@ class DM4Config(NamedTuple):
     data_type_dict: dict[int, DM4DataType]
     header_size: int
     root_tag_dir_header_size: int
+
+
+class DM4TagDir(NamedTuple):
+    """Description of a directory in a DM4 file"""
+    name: str
+    dm4_tag: DM4DirHeader
+    named_subdirs: dict[str, DM4TagDir]
+    unnamed_subdirs: list[DM4TagDir]
+    named_tags: dict[str, DM4TagHeader]
+    unnamed_tags: list[DM4TagHeader]
 
 
 format_config = DM4Config(
