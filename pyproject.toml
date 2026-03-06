@@ -4,12 +4,11 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "dm4"
-authors = [{ name = "James Anderson", email = "james.r.anderson@utah.edu" }]
+authors = [{ name = "James Anderson", email = "james.anderson@pitt.edu" }]
 readme = "README.rst"
-license = { file = "LICENSE" }
+license = "MIT"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3", 
     "Operating System :: OS Independent",
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -17,6 +16,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering :: Bio-Informatics"
 ]
+keywords = ["dm4", "digital micrograph", "electron microscopy", "TEM", "SEM", "Gatan", "image", "file format"]
 dynamic = ["version", "description"]
 
 [project.optional-dependencies]
