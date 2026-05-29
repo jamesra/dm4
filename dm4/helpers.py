@@ -2,42 +2,42 @@
 Helper functions for working with dm4 files
 """
 
+from __future__ import annotations
+
 import sys
-from typing import Union
 import array
 from dm4.dm4file import DM4File
-from dm4.headers import DM4TagDir, DM4TagHeader, DM4DirHeader
+from dm4.headers import DM4TagDir, DM4TagHeader
 
 
-def _is_python3():
+def _is_python3() -> bool:
     return sys.version_info[0] == 3
 
 
-def try_convert_unsigned_short_to_unicode(data: array.array, count_limit: int = 2048):
+def try_convert_unsigned_short_to_unicode(
+    data: array.array | str, count_limit: int = 2048
+) -> array.array | str:
     """Attempt to convert arrays of 16-bit integers of less than specified length to a unicode string."""
 
     if not isinstance(data, array.array):
         return data
 
-    if data.typecode == 'H' and len(data) < count_limit:
+    if data.typecode == "H" and len(data) < count_limit:
         try:
-            if _is_python3():
-                data = data.tobytes().decode('utf-16')
-            else:
-                data = data.tostring().decode('utf-16')
-        except UnicodeDecodeError as e:
+            data = data.tobytes().decode("utf-16")
+        except UnicodeDecodeError:
             pass
-        except UnicodeEncodeError as e:
+        except UnicodeEncodeError:
             pass
 
     return data
 
 
-def print_tag_data(dmfile: DM4File, tag: Union[DM4TagHeader, DM4DirHeader], indent_level: int):
+def print_tag_data(dmfile: DM4File, tag: DM4TagHeader, indent_level: int) -> None:
     """Print data associated with a dm4 tag"""
 
     if tag.byte_length > 2048:
-        print(indent_level * '\t' + '%s\t' % (tag.name) + "Array length %d too long to read" % (tag.array_length))
+        print(indent_level * "\t" + "%s\t" % (tag.name) + "Array length %d too long to read" % (tag.array_length))
         return
 
     try:
@@ -48,18 +48,10 @@ def print_tag_data(dmfile: DM4File, tag: Union[DM4TagHeader, DM4DirHeader], inde
 
     data = try_convert_unsigned_short_to_unicode(data)
 
-    if _is_python3():
-        print(indent_level * '\t' + '%s\t%s' % (tag.name, str(data)))
+    if isinstance(data, array.array) and data.typecode == "H":
+        print(indent_level * "\t" + "%s\t%s" % (tag.name, "Unconverted array of unsigned 16-bit integers"))
     else:
-        if isinstance(data, array.array) and data.typecode == 'H':  # Unconverted unicode or image data
-            print(indent_level * '\t' + '%s\t%s' % (tag.name, "Unconverted array of unsigned 16-bit integers"))
-        elif isinstance(data, unicode):
-            print(indent_level * '\t' + '%s\t%s' % (tag.name, data))
-        else:
-            if tag.name is None:
-                print(indent_level * '\t' + 'Unnamed tag\t%s' % (str(data)))
-            else:
-                print(indent_level * '\t' + tag.name.encode('ascii', 'ignore') + '\t%s' % (str(data)))
+        print(indent_level * "\t" + "%s\t%s" % (tag.name, str(data)))
 
 
 def print_tag_directory_tree(dmfile: DM4File,

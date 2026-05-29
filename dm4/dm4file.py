@@ -1,6 +1,6 @@
 from __future__ import annotations
 import contextlib
-from typing import NamedTuple, BinaryIO, Generator, Any, Optional
+from typing import NamedTuple, BinaryIO, Generator, Any, Optional, cast
 import struct
 import array
 import sys
@@ -42,19 +42,20 @@ class DM4File:
         :param file filedata: file handle to dm4 file
         """
         self._hfile = filedata
-        self.header = read_header_dm4(self.hfile)
+        self.header = read_header_dm4(filedata)
         self._endian_str = _get_struct_endian_str(self.header.little_endian)
 
-        self.root_tag_dir_header = read_root_tag_dir_header_dm4(self.hfile, endian=self.endian_str)
+        self.root_tag_dir_header = read_root_tag_dir_header_dm4(filedata, endian=self.endian_str)
 
-    def close(self):
+    def close(self) -> None:
         """Manually close the file handle if one is not using a context manager"""
-        self._hfile.close()
-        self._hfile = None
+        if self._hfile is not None:
+            self._hfile.close()
+            self._hfile = None
 
     @staticmethod
     @contextlib.contextmanager
-    def open(filename: str) -> Generator[BinaryIO, None, None]:
+    def open(filename: str) -> Generator[DM4File, None, None]:
         """
         Use this method to open a DM4 file.  The file will be closed when the context is exited.
 
@@ -73,39 +74,42 @@ class DM4File:
 
     def read_tag_data(self, tag: DM4TagHeader) -> Any:
         """Read the data associated with the passed tag"""
-        return _read_tag_data(self.hfile, tag, self.endian_str)
+        assert self._hfile is not None
+        return _read_tag_data(self._hfile, tag, self.endian_str)
 
     def read_directory(self, directory_tag: DM4DirHeader | None = None) -> DM4TagDir:
         """
         Read the directories and tags from a dm4 file.  The first step in working with a dm4 file.
         :return: A named collection containing information about the directory
         """
-
+        assert self._hfile is not None
         if directory_tag is None:
             directory_tag = self.root_tag_dir_header
 
-        dir_obj = DM4TagDir(directory_tag.name, directory_tag, {}, [], {}, [])
+        dir_obj = DM4TagDir(directory_tag.name or "", directory_tag, {}, [], {}, [])
 
         for iTag in range(0, directory_tag.num_tags):
-            tag = read_tag_header_dm4(self.hfile, self.endian_str)
+            tag = read_tag_header_dm4(self._hfile, self.endian_str)
             if tag is None:
                 break
 
             if tag_is_directory(tag):
-                if tag.name is None:
-                    dir_obj.unnamed_subdirs.append(self.read_directory(tag))
+                dir_header = cast(DM4DirHeader, tag)
+                if dir_header.name is None:
+                    dir_obj.unnamed_subdirs.append(self.read_directory(dir_header))
                 else:
-                    dir_obj.named_subdirs[tag.name] = self.read_directory(tag)
+                    dir_obj.named_subdirs[dir_header.name] = self.read_directory(dir_header)
             else:
-                if tag.name is None:
-                    dir_obj.unnamed_tags.append(tag)
+                tag_header = cast(DM4TagHeader, tag)
+                if tag_header.name is None:
+                    dir_obj.unnamed_tags.append(tag_header)
                 else:
-                    dir_obj.named_tags[tag.name] = tag
+                    dir_obj.named_tags[tag_header.name] = tag_header
 
         return dir_obj
 
 
-def tag_is_directory(tag: DM4TagHeader) -> bool:
+def tag_is_directory(tag: DM4TagHeader | DM4DirHeader) -> bool:
     return tag.type == 20
 
 
@@ -187,7 +191,7 @@ def read_tag_header_dm4(dmfile: BinaryIO, endian: str) -> DM4TagHeader | DM4DirH
     (tag_array_length, tag_array_types) = _read_tag_data_info(dmfile)
 
     dmfile.seek(tag_data_offset + tag_byte_length)
-    return DM4TagHeader(tag_type, tag_name, tag_byte_length, tag_array_length, tag_array_types[0], tag_header_offset,
+    return DM4TagHeader(tag_type, tag_name or "", tag_byte_length, tag_array_length, tag_array_types[0], tag_header_offset,
                         tag_data_offset)
 
 
@@ -313,7 +317,7 @@ def system_byte_order() -> str:
     return '<' if sys.byteorder == 'little' else '>'
 
 
-def read_tag_data_array(dmfile: BinaryIO, tag: DM4TagHeader, endian: str) -> array.array:
+def read_tag_data_array(dmfile: BinaryIO, tag: DM4TagHeader, endian: str) -> array.array | str:
     dmfile.seek(tag.data_offset)
 
     _check_tag_verification_str(dmfile)

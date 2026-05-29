@@ -104,7 +104,7 @@ class TestDM4(unittest.TestCase):
                 image_array = np.reshape(image_array, (YDim, XDim))
 
                 output_fullpath = "sample.tif"
-                image = PIL.Image.fromarray(image_array, 'I;16')
+                image = Image.fromarray(image_array, 'I;16')
                 image.save(output_fullpath)
 
         finally:
