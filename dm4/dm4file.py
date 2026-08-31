@@ -191,7 +191,10 @@ def read_tag_header_dm4(dmfile: BinaryIO, endian: str) -> DM4TagHeader | DM4DirH
     (tag_array_length, tag_array_types) = _read_tag_data_info(dmfile)
 
     dmfile.seek(tag_data_offset + tag_byte_length)
-    return DM4TagHeader(tag_type, tag_name or "", tag_byte_length, tag_array_length, tag_array_types[0], tag_header_offset,
+    # tag_name stays None for an unnamed tag rather than becoming "". read_directory sorts
+    # tags by `name is None`, so coercing here filed every unnamed tag under named_tags[""],
+    # where each one overwrote the last and unnamed_tags was always empty. See review #243.
+    return DM4TagHeader(tag_type, tag_name, tag_byte_length, tag_array_length, tag_array_types[0], tag_header_offset,
                         tag_data_offset)
 
 

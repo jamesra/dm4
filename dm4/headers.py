@@ -10,7 +10,9 @@ class DM4Header(NamedTuple):
 
 class DM4TagHeader(NamedTuple):
     type: int
-    name: str
+    # Optional, matching DM4DirHeader: unnamed tags are how DM4 stores ordered sequences such
+    # as image dimensions, and read_directory separates them on `name is None`.
+    name: Optional[str]
     byte_length: int
     array_length: int
     data_type_code: int
