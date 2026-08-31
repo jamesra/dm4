@@ -25,8 +25,17 @@ class TestDM4(unittest.TestCase):
 
     @property
     def dm4_input_filename(self) -> str:
-        """The name of a dm4 file to read during the test.  Change this to suit your test input file"""
-        return 'Glumi1_3VBSED_stack_00_slice_0476.dm4'
+        """A dm4 file to read during the test, relative to TESTINPUTPATH.
+
+        Change this to suit your test input file. The path is relative rather than a bare
+        name because the corpus is organised by platform; naming only the file made both
+        tests in this module fail with FileNotFoundError, and since they are the only two
+        that open a real dm4 file, nothing was reading an image array from disk at all.
+        That masked review #243 for as long as it went unnoticed -- the readme example these
+        tests exist to check was itself broken, and would have said so on the first run.
+        """
+        return os.path.join('PlatformRaw', 'DM4', 'Neitz',
+                            'Glumi1_3VBSED_stack_00_slice_0476.dm4')
 
     @property
     def dm4_input_dirname(self) -> str:
@@ -35,6 +44,17 @@ class TestDM4(unittest.TestCase):
             return os.environ['TESTINPUTPATH']
 
         raise ValueError('TESTINPUTPATH environment variable not set')
+
+    def setUp(self):
+        """Skip rather than fail when the corpus is absent.
+
+        A missing test corpus is not a defect in this package, but it must not read as a pass
+        either; that is how #243 stayed hidden.
+        """
+        if 'TESTINPUTPATH' not in os.environ:
+            self.skipTest('TESTINPUTPATH is not set, so no dm4 corpus is available')
+        if not os.path.exists(self.dm4_input_fullpath):
+            self.skipTest(f'dm4 test file not found: {self.dm4_input_fullpath}')
 
     @property
     def FirstImageDimensionsTag(self) -> DM4TagDir:
