@@ -95,7 +95,7 @@ class TestDM4(unittest.TestCase):
         np_array = np.array(dmfile.read_tag_data(data_tag), dtype=np.uint16)
         np_array = np.reshape(np_array, self.ReadImageShape(self.FirstImageDimensionsTag))
 
-        image = Image.fromarray(np_array, 'I;16')
+        image = Image.fromarray(np_array)
         image.save(output_fullpath)
 
         dmfile.close()
@@ -124,7 +124,7 @@ class TestDM4(unittest.TestCase):
                 image_array = np.reshape(image_array, (YDim, XDim))
 
                 output_fullpath = "sample.tif"
-                image = Image.fromarray(image_array, 'I;16')
+                image = Image.fromarray(image_array)
                 image.save(output_fullpath)
 
         finally:

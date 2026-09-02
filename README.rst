@@ -38,7 +38,7 @@ Below is a short example of reading the image data from a dm4 file.  A more comp
        image_array = np.reshape(image_array, (YDim, XDim))
 
        output_fullpath = "sample.tif"
-       image = PIL.Image.fromarray(image_array, 'I;16')
+       image = PIL.Image.fromarray(image_array)
        image.save(output_fullpath)
 
 ############
