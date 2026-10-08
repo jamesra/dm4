@@ -157,6 +157,14 @@ def _get_struct_endian_str(endian: str | int | bool) -> str:
             return '<'  # Big Endian
 
 
+def _read_dir_metadata(dmfile: BinaryIO, endian: str) -> tuple[bool, bool, int]:
+    """Read the (issorted, isclosed, num_tags) fields that follow the length of a directory tag."""
+    issorted = struct.unpack_from(endian + 'b', dmfile.read(1))[0]
+    isclosed = struct.unpack_from(endian + 'b', dmfile.read(1))[0]
+    num_tags = struct.unpack_from('>Q', dmfile.read(8))[0]  # DM4 specifies this property as always big endian
+    return issorted, isclosed, num_tags
+
+
 def read_root_tag_dir_header_dm4(dmfile: BinaryIO, endian: str | int):
     """Read the root directory information from a dm4 file.
        File seek position is left at end of root_tag_dir_header"""
@@ -165,9 +173,7 @@ def read_root_tag_dir_header_dm4(dmfile: BinaryIO, endian: str | int):
 
     dmfile.seek(dm4.format_config.header_size)
 
-    issorted = struct.unpack_from(endian + 'b', dmfile.read(1))[0]  # type: bool
-    isclosed = struct.unpack_from(endian + 'b', dmfile.read(1))[0]  # type: bool
-    num_tags = struct.unpack_from('>Q', dmfile.read(8))[0]  # DM4 specifies this property as always big endian
+    issorted, isclosed, num_tags = _read_dir_metadata(dmfile, endian)
 
     return DM4DirHeader(20, None, 0, issorted, isclosed, num_tags, dm4.format_config.header_size)
 
@@ -216,9 +222,7 @@ def _read_tag_name(dmfile: BinaryIO) -> str | None:
 def _read_tag_dir_header_dm4(dmfile: BinaryIO, endian: str) -> DM4DirHeader:
     tag_name = _read_tag_name(dmfile)
     tag_byte_length = struct.unpack_from('>Q', dmfile.read(8))[0]  # DM4 specifies this property as always big endian
-    issorted = struct.unpack_from(endian + 'b', dmfile.read(1))[0]
-    isclosed = struct.unpack_from(endian + 'b', dmfile.read(1))[0]
-    num_tags = struct.unpack_from('>Q', dmfile.read(8))[0]  # DM4 specifies this property as always big endian
+    issorted, isclosed, num_tags = _read_dir_metadata(dmfile, endian)
 
     data_offset = dmfile.tell()
 
