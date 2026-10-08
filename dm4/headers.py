@@ -62,6 +62,23 @@ class DM4TagDir(NamedTuple):
     unnamed_tags: list[DM4TagHeader]
 
 
+TAG_TYPE_END = 0
+"""Tag type byte that ends a directory's tag list early."""
+TAG_TYPE_DIRECTORY = 20
+"""Tag type byte for a directory of further tags."""
+TAG_TYPE_DATA = 21
+"""Tag type byte for a tag that holds data."""
+
+TAG_DATA_TYPE_GROUP = 15
+"""Data type code for a group (struct) of fields."""
+TAG_DATA_TYPE_ARRAY = 20
+"""Data type code for an array. Same value as TAG_TYPE_DIRECTORY, but a different field of the file."""
+
+UINT64_SIZE = 8
+"""Width in bytes of the big-endian uint64 DM4 uses for lengths and counts."""
+INT64_SIZE = 8
+"""Width in bytes of each big-endian int64 entry in a tag's data type list."""
+
 format_config = DM4Config(
     {
         2: DM4DataType(2, True, "h"),  # 2byte signed integer
@@ -76,6 +93,6 @@ format_config = DM4Config(
         11: DM4DataType(8, True, "q"),
         12: DM4DataType(8, True, "Q"),
     },
-    header_size=4 + 8 + 4,
-    root_tag_dir_header_size=1 + 1 + 8,
+    header_size=4 + UINT64_SIZE + 4,
+    root_tag_dir_header_size=1 + 1 + UINT64_SIZE,
 )

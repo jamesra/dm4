@@ -6,7 +6,8 @@ import array
 import sys
 
 import dm4
-from dm4.headers import DM4TagHeader, DM4Header, DM4DirHeader, DM4TagDir
+from dm4.headers import (DM4TagHeader, DM4Header, DM4DirHeader, DM4TagDir, TAG_TYPE_END, TAG_TYPE_DIRECTORY,
+                         TAG_TYPE_DATA, TAG_DATA_TYPE_GROUP, TAG_DATA_TYPE_ARRAY, UINT64_SIZE, INT64_SIZE)
 
 from dm4 import format_config
 
@@ -110,13 +111,13 @@ class DM4File:
 
 
 def tag_is_directory(tag: DM4TagHeader | DM4DirHeader) -> bool:
-    return tag.type == 20
+    return tag.type == TAG_TYPE_DIRECTORY
 
 
 def read_header_dm4(dmfile: BinaryIO) -> DM4Header:
     dmfile.seek(0)
     version = struct.unpack_from('>I', dmfile.read(4))[0]  # int.from_bytes(dmfile.read(4), byteorder='big')
-    rootlength = struct.unpack_from('>Q', dmfile.read(8))[0]
+    rootlength = struct.unpack_from('>Q', dmfile.read(UINT64_SIZE))[0]
     byteorder = struct.unpack_from('>I', dmfile.read(4))[0]
 
     little_endian = byteorder == 1
@@ -161,7 +162,7 @@ def _read_dir_metadata(dmfile: BinaryIO, endian: str) -> tuple[bool, bool, int]:
     """Read the (issorted, isclosed, num_tags) fields that follow the length of a directory tag."""
     issorted = struct.unpack_from(endian + 'b', dmfile.read(1))[0]
     isclosed = struct.unpack_from(endian + 'b', dmfile.read(1))[0]
-    num_tags = struct.unpack_from('>Q', dmfile.read(8))[0]  # DM4 specifies this property as always big endian
+    num_tags = struct.unpack_from('>Q', dmfile.read(UINT64_SIZE))[0]  # DM4 specifies this property as always big endian
     return issorted, isclosed, num_tags
 
 
@@ -175,20 +176,20 @@ def read_root_tag_dir_header_dm4(dmfile: BinaryIO, endian: str | int):
 
     issorted, isclosed, num_tags = _read_dir_metadata(dmfile, endian)
 
-    return DM4DirHeader(20, None, 0, issorted, isclosed, num_tags, dm4.format_config.header_size)
+    return DM4DirHeader(TAG_TYPE_DIRECTORY, None, 0, issorted, isclosed, num_tags, dm4.format_config.header_size)
 
 
 def read_tag_header_dm4(dmfile: BinaryIO, endian: str) -> DM4TagHeader | DM4DirHeader | None:
     """Read the tag from the file.  Leaves file at the end of the tag data, ready to read the next tag from the file"""
     tag_header_offset = dmfile.tell()
     tag_type = struct.unpack_from(endian + 'B', dmfile.read(1))[0]
-    if tag_type == 20:
+    if tag_type == TAG_TYPE_DIRECTORY:
         return _read_tag_dir_header_dm4(dmfile, endian)
-    if tag_type == 0:
+    if tag_type == TAG_TYPE_END:
         return None
 
     tag_name = _read_tag_name(dmfile)
-    tag_byte_length = struct.unpack_from('>Q', dmfile.read(8))[0]  # DM4 specifies this property as always big endian
+    tag_byte_length = struct.unpack_from('>Q', dmfile.read(UINT64_SIZE))[0]  # DM4 specifies this property as always big endian
 
     tag_data_offset = dmfile.tell()
 
@@ -221,12 +222,12 @@ def _read_tag_name(dmfile: BinaryIO) -> str | None:
 
 def _read_tag_dir_header_dm4(dmfile: BinaryIO, endian: str) -> DM4DirHeader:
     tag_name = _read_tag_name(dmfile)
-    tag_byte_length = struct.unpack_from('>Q', dmfile.read(8))[0]  # DM4 specifies this property as always big endian
+    tag_byte_length = struct.unpack_from('>Q', dmfile.read(UINT64_SIZE))[0]  # DM4 specifies this property as always big endian
     issorted, isclosed, num_tags = _read_dir_metadata(dmfile, endian)
 
     data_offset = dmfile.tell()
 
-    return DM4DirHeader(20, tag_name, tag_byte_length, issorted, isclosed, num_tags, data_offset)
+    return DM4DirHeader(TAG_TYPE_DIRECTORY, tag_name, tag_byte_length, issorted, isclosed, num_tags, data_offset)
 
 
 def _check_tag_verification_str(dmfile: BinaryIO) -> None:
@@ -241,16 +242,16 @@ def _check_tag_verification_str(dmfile: BinaryIO) -> None:
 
 def _read_tag_data_info(dmfile: BinaryIO) -> tuple[int, tuple[int, ...]]:
     # DM4 specifies this property as always big endian
-    tag_array_length = struct.unpack_from('>Q', dmfile.read(8))[0]
+    tag_array_length = struct.unpack_from('>Q', dmfile.read(UINT64_SIZE))[0]
     format_str = '>' + tag_array_length * 'q'  # Big endian signed long
 
-    tag_array_types = struct.unpack_from(format_str, dmfile.read(8 * tag_array_length))  # type: tuple[int, ...]
+    tag_array_types = struct.unpack_from(format_str, dmfile.read(INT64_SIZE * tag_array_length))  # type: tuple[int, ...]
 
     return tag_array_length, tag_array_types
 
 
 def _read_tag_data(dmfile: BinaryIO, tag: DM4TagHeader, endian: str) -> Any:
-    assert (tag.type == 21)
+    assert (tag.type == TAG_TYPE_DATA)
     try:
         endian = _get_struct_endian_str(endian)
         dmfile.seek(tag.data_offset)
@@ -260,9 +261,9 @@ def _read_tag_data(dmfile: BinaryIO, tag: DM4TagHeader, endian: str) -> Any:
 
         tag_data_type_code = tag_array_types[0]
 
-        if tag_data_type_code == 15:
+        if tag_data_type_code == TAG_DATA_TYPE_GROUP:
             return read_tag_data_group(dmfile, tag, endian)
-        elif tag_data_type_code == 20:
+        elif tag_data_type_code == TAG_DATA_TYPE_ARRAY:
             return read_tag_data_array(dmfile, tag, endian)
 
         if tag_data_type_code not in dm4.format_config.data_type_dict:
@@ -298,7 +299,7 @@ def read_tag_data_group(dmfile: BinaryIO, tag: DM4TagHeader, endian: str) -> lis
     (tag_array_length, tag_array_types) = _read_tag_data_info(dmfile)
 
     tag_data_type = tag_array_types[0]
-    assert (tag_data_type == 15)
+    assert (tag_data_type == TAG_DATA_TYPE_GROUP)
 
     length_groupname = tag_array_types[1]
     number_of_entries_in_group = tag_array_types[2]
@@ -331,11 +332,11 @@ def read_tag_data_array(dmfile: BinaryIO, tag: DM4TagHeader, endian: str) -> arr
 
     (tag_array_length, tag_array_types) = _read_tag_data_info(dmfile)
 
-    assert (tag_array_types[0] == 20)
+    assert (tag_array_types[0] == TAG_DATA_TYPE_ARRAY)
     array_data_type_code = tag_array_types[1]
     array_length = tag_array_types[2]
 
-    if array_data_type_code == 15:
+    if array_data_type_code == TAG_DATA_TYPE_GROUP:
         return "Array of groups length %d and type %d" % (array_length, array_data_type_code)
 
     assert (len(tag_array_types) == 3)
